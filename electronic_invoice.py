@@ -39,6 +39,21 @@ class journal_pyafipws_electronic_invoice(osv.osv):
             help="Habilita la facturación electrónica por webservices AFIP"),
     }
 
+    def test_pyafipws_dummy(self, cr, uid, ids, context=None):
+        # import AFIP webservice helper for electronic invoice
+        from pyafipws.wsfev1 import WSFEv1
+        wsfev1 = WSFEv1()
+        # connect to the webservice and call to the test method
+        wsfev1.Conectar()
+        wsfev1.Dummy()
+        msg = "AFIP AppServerStatus: %s DbServerStatus: %s AuthServerStatus: %s" 
+        msg = msg % (
+                wsfev1.AppServerStatus, 
+                wsfev1.DbServerStatus,
+                wsfev1.AuthServerStatus)        
+        self.log(cr, uid, ids[0], msg) 
+        return {}
+    
 
 journal_pyafipws_electronic_invoice()
 

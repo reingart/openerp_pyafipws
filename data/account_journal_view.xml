@@ -12,8 +12,10 @@
                         <group col="2">
                             <field name="pyafipws_electronic_invoice"></field>
                         </group>
-                        <!--button name="test_afip_" string="Test" 
-                                type="object"/-->
+                        <button name="test_pyafipws_dummy" string="Dummy" 
+                                type="object"/>
+                        <button name="test_pyafipws_last_invoice" 
+                                string="Last Invoice" type="object"/>
                     </page>
                 </notebook>
 			</field>  
