@@ -9,16 +9,18 @@
                 <field name="arch" type="xml"> 
                 <notebook>
                     <page string="Argentina AFIP Webservices">
-                        <group col="2">
+                        <group col="2" colspan="3">
                             <field name="pyafipws_electronic_invoice_service"/>
                             <field name="pyafipws_invoice_type"></field>
                             <field name="pyafipws_point_of_sale"></field>
                             <!---field name="pyafipws_last_invoice_number" /-->
                         </group>
-                        <button name="test_pyafipws_dummy" string="Dummy" 
-                                type="object"/>
-                        <button name="get_pyafipws_last_invoice" 
-                                string="Last Invoice" type="object"/>
+                        <group col="1" colspan="1">
+                            <button name="test_pyafipws_dummy" string="Dummy" 
+                                    type="object"/>
+                            <button name="get_pyafipws_last_invoice" 
+                                    string="Last Invoice" type="object"/>
+                        </group>
                     </page>
                 </notebook>
 			</field>  

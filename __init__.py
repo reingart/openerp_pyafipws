@@ -1,3 +1,3 @@
 import authentication
-import electronic_invoice
+import journal
 
