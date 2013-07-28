@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<openerp>
+    <data>
+        <record model="ir.ui.view" id="view_account_journal_pyafipws_form">
+            <field name="name">account.journal.afip.form</field>
+            <field name="model">account.journal</field>
+			<field name="inherit_id" ref="account.view_account_journal_form" />
+                <field name="type">form</field>
+                <field name="arch" type="xml"> 
+                <notebook>
+                    <page string="Argentina AFIP Webservices">
+                        <group col="2">
+                            <field name="pyafipws_electronic_invoice"></field>
+                        </group>
+                        <!--button name="test_afip_" string="Test" 
+                                type="object"/-->
+                    </page>
+                </notebook>
+			</field>  
+		</record>
+    </data>
+</openerp>
+
