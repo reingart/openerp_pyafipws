@@ -34,9 +34,32 @@ class journal_pyafipws_electronic_invoice(osv.osv):
     _name = "account.journal"
     _inherit = "account.journal"
     _columns = {
-        'pyafipws_electronic_invoice': fields.boolean(
-            _('AFIP WS electronic invoice'), 
+        'pyafipws_electronic_invoice_service': fields.selection([
+			    ('wsfe','Mercado interno -sin detalle- RG2485 (WSFEv1)'),
+			    ('wsmtxca','Mercado interno -con detalle- RG2904 (WSMTXCA)'),
+			    ('wsbfe','Bono Fiscal -con detalle- RG2557 (WSMTXCA)'),
+			    ('wsfex','Exportación -con detalle- RG2758 (WSFEXv1)'),
+            ], _('AFIP WS electronic invoice'), 
             help="Habilita la facturación electrónica por webservices AFIP"),
+		'pyafipws_invoice_type' : fields.selection([
+			    (' 1','01-Factura A'),
+			    (' 2','02-Nota de Débito A'),
+			    (' 3','03-Nota de Crédito A'),
+			    (' 4','04-Recibos A'),
+			    (' 5','05-Nota de Venta al Contado A'),
+			    (' 6','06-Factura B'),
+			    (' 7','07-Nota de Débito B'),
+			    (' 8','08-Nota de Crédito B'),
+			    (' 9','09-Recibos B'),
+			    ('10','10-Notas de Venta al Contado B'),
+			    ('11','11-Factura C'),
+			    ('12','12-Nota de Débito C'),
+			    ('13','13-Nota de Crédito C'),
+			    ('15','Recibo C'),
+			    ], 'Tipo Comprobante AFIP', 
+            help="Tipo de Comprobante AFIP"),
+		'pyafipws_point_of_sale' : fields.integer('Punto de Venta AFIP', 
+            help="Prefijo de emisión habilitado en AFIP"),
     }
 
     def test_pyafipws_dummy(self, cr, uid, ids, context=None):
@@ -54,6 +77,41 @@ class journal_pyafipws_electronic_invoice(osv.osv):
         self.log(cr, uid, ids[0], msg) 
         return {}
     
+    def get_pyafipws_last_invoice(self, cr, uid, ids, 
+                                  fields_name=None, arg=None, context=None):
+        ret = {}
+        for journal in self.browse(cr, uid, ids):
+            company = journal.company_id
+            tipo_cbte = journal.pyafipws_invoice_type
+            punto_vta = journal.pyafipws_point_of_sale
+            service = journal.pyafipws_electronic_invoice_service
+            # authenticate:
+            auth_data = company.pyafipws_authenticate(service=service)            
+            # import AFIP webservice helper for electronic invoice       
+            from pyafipws.wsfev1 import WSFEv1
+            wsfev1 = WSFEv1()
+            # connect to the webservice and call to the test method
+            wsfev1.Conectar()            
+            if auth_data['token']:
+                # set AFIP webservice credentials:
+                wsfev1.Cuit = company.pyafipws_cuit
+                wsfev1.Token = auth_data['token']
+                wsfev1.Sign = auth_data['sign']
+                ult = wsfev1.CompUltimoAutorizado(tipo_cbte, punto_vta)
+                msg = " - ".join([wsfev1.Excepcion, wsfev1.ErrMsg, wsfev1.Obs])
+                self.log(cr, uid, ids[0], "Last Cbte: %s msg: %s" % (ult, msg))
+                ret[journal.id] = str(ult)
+            else:
+                msg = auth_data['err_msg']
+                raise osv.except_osv(_("ERROR"), msg)
+        return ret
+
+    #_columns.update({
+    #    'pyafipws_last_invoice_number': fields.function(
+    #        get_pyafipws_last_invoice, type='integer', string='Ult. Nro.', 
+    #        help="Último número de factura registrada en AFIP", method=True),
+    #})
+
 
 journal_pyafipws_electronic_invoice()
 
