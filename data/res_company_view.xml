@@ -14,8 +14,8 @@
                             <field name="pyafipws_certificate"></field>					
                             <field name="pyafipws_private_key"></field>
                         </group>
-                        <button name="test_afip_authentication" string="Test" 
-                                type="object"/>
+                        <button name="test_pyafipws_authentication" 
+                                string="Test" type="object"/>
                     </page>
                 </notebook>
 			</field>  

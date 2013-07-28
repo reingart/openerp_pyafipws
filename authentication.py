@@ -22,12 +22,15 @@ __copyright__ = "Copyright (C) 2013 Mariano Reingart and others"
 __license__ = "AGPL 3.0+"
 
 from osv import fields, osv
-from openerp.tools.translate import _
-
+try:
+    from openerp.tools.translate import _
+except:
+    _ = str
+    
 DEBUG = True
 
 
-class company_afip_webservices_credentials(osv.osv):
+class company_pyafipws_credentials(osv.osv):
     _name = "res.company"
     _inherit = "res.company"
     _columns = {
@@ -39,7 +42,7 @@ class company_afip_webservices_credentials(osv.osv):
             help="Clave Privada (.key) de la empresa para webservices AFIP"),
     }
     
-    def afip_authenticate(self, cr, uid, ids, context=None, service="wsfe"):
+    def pyafipws_authenticate(self, cr, uid, ids, context=None, service="wsfe"):
         "Authenticate against AFIP, returns token, sign, err_msg (dict)"
         import afip_auth
         auth_data = {}
@@ -50,8 +53,8 @@ class company_afip_webservices_credentials(osv.osv):
             auth_data.update(auth)
         return auth_data
 
-    def test_afip_authentication(self, cr, uid, ids, context=None):
-        auth_data = self.afip_authenticate(cr, uid, ids)
+    def test_pyafipws_authentication(self, cr, uid, ids, context=None):
+        auth_data = self.pyafipws_authenticate(cr, uid, ids)
         #self.log(cr, uid, ids[0], "test_afip_auth: %s" % auth_data)        
         from base64 import b64decode
         if auth_data['token']:
@@ -63,21 +66,21 @@ class company_afip_webservices_credentials(osv.osv):
         return {}
 
 
-company_afip_webservices_credentials()
+company_pyafipws_credentials()
 
 
 if __name__ == "__main__":
     # basic tests:
     from osv import cursor
-    mycompany = company_afip_webservices_credentials()
-    auth_data = mycompany.afip_authenticate(cursor(), None, [1], service="wsfe")
+    mycompany = company_pyafipws_credentials()
+    auth_data = mycompany.pyafipws_authenticate(cursor(), None, [1], service="wsfe")
     print auth_data
     assert auth_data['token']
     assert auth_data['sign']
     old_token = auth_data['token']
-    auth_data = mycompany.afip_authenticate(cursor(), None, [1], service="wsfe")
+    auth_data = mycompany.pyafipws_authenticate(cursor(), None, [1], service="wsfe")
     assert auth_data['token'] == old_token
-    ta = mycompany.test_afip_authenticate(cursor(), None, [1])
+    ta = mycompany.test_pyafipws_authentication(cursor(), None, [1])
     print ta
     print "ok."
     
