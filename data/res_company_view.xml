@@ -9,9 +9,13 @@
                 <field name="arch" type="xml"> 
                 <notebook>
                     <page string="Argentina AFIP Webservices">
-                        <field name="pyafipws_cuit"></field>
-                        <field name="pyafipws_certificate"></field>					
-                        <field name="pyafipws_private_key"></field>
+                        <group col="2">
+                            <field name="pyafipws_cuit"></field>
+                            <field name="pyafipws_certificate"></field>					
+                            <field name="pyafipws_private_key"></field>
+                        </group>
+                        <button name="test_afip_authentication" string="Test" 
+                                type="object"/>
                     </page>
                 </notebook>
 			</field>  

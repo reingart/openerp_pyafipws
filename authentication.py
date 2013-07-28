@@ -22,6 +22,7 @@ __copyright__ = "Copyright (C) 2013 Mariano Reingart and others"
 __license__ = "AGPL 3.0+"
 
 from osv import fields, osv
+from openerp.tools.translate import _
 
 DEBUG = True
 
@@ -43,11 +44,23 @@ class company_afip_webservices_credentials(osv.osv):
         import afip_auth
         auth_data = {}
         for company in self.browse(cr, uid, ids):
-            certificate = company.pyafipws_certificate
-            private_key = company.pyafipws_private_key
+            certificate = str(company.pyafipws_certificate)
+            private_key = str(company.pyafipws_private_key)
             auth = afip_auth.authenticate(service, certificate, private_key)
             auth_data.update(auth)
         return auth_data
+
+    def test_afip_authentication(self, cr, uid, ids, context=None):
+        auth_data = self.afip_authenticate(cr, uid, ids)
+        #self.log(cr, uid, ids[0], "test_afip_auth: %s" % auth_data)        
+        from base64 import b64decode
+        if auth_data['token']:
+            msg = b64decode(auth_data['token'])
+            raise osv.except_osv(_("OK"), msg)
+        else:
+            msg = auth_data['err_msg']
+            raise osv.except_osv(_("ERROR"), msg)
+        return {}
 
 
 company_afip_webservices_credentials()
@@ -64,5 +77,7 @@ if __name__ == "__main__":
     old_token = auth_data['token']
     auth_data = mycompany.afip_authenticate(cursor(), None, [1], service="wsfe")
     assert auth_data['token'] == old_token
+    ta = mycompany.test_afip_authenticate(cursor(), None, [1])
+    print ta
     print "ok."
     
