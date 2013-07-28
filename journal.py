@@ -76,6 +76,30 @@ class journal_pyafipws_electronic_invoice(osv.osv):
                 wsfev1.AuthServerStatus)        
         self.log(cr, uid, ids[0], msg) 
         return {}
+
+    def test_pyafipws_point_of_sales(self, cr, uid, ids, context=None):
+        for journal in self.browse(cr, uid, ids):
+            company = journal.company_id
+            tipo_cbte = journal.pyafipws_invoice_type
+            punto_vta = journal.pyafipws_point_of_sale
+            service = journal.pyafipws_electronic_invoice_service
+            # authenticate against AFIP:
+            auth_data = company.pyafipws_authenticate(service=service)            
+            # import AFIP webservice helper for electronic invoice
+            from pyafipws.wsfev1 import WSFEv1
+            wsfev1 = WSFEv1()
+            # connect to the webservice and call to the test method
+            wsfev1.Conectar()
+            # set AFIP webservice credentials:
+            wsfev1.Cuit = company.pyafipws_cuit
+            wsfev1.Token = auth_data['token']
+            wsfev1.Sign = auth_data['sign']
+            # call the webservice method to get the enabled point of sales:
+            ret = wsfev1.ParamGetPtosVenta(sep=" ")
+            msg = "Pts.Vta. Habilitados en AFIP: " + '. '.join(ret)
+            msg += " - ".join([wsfev1.Excepcion, wsfev1.ErrMsg, wsfev1.Obs])
+            self.log(cr, uid, ids[0], msg) 
+            return {}
     
     def get_pyafipws_last_invoice(self, cr, uid, ids, 
                                   fields_name=None, arg=None, context=None):
@@ -97,6 +121,7 @@ class journal_pyafipws_electronic_invoice(osv.osv):
                 wsfev1.Cuit = company.pyafipws_cuit
                 wsfev1.Token = auth_data['token']
                 wsfev1.Sign = auth_data['sign']
+                # call the webservice method to get the last invoice at AFIP:
                 ult = wsfev1.CompUltimoAutorizado(tipo_cbte, punto_vta)
                 msg = " - ".join([wsfev1.Excepcion, wsfev1.ErrMsg, wsfev1.Obs])
                 self.log(cr, uid, ids[0], "Last Cbte: %s msg: %s" % (ult, msg))
