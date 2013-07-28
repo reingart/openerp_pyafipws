@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<openerp>
+    <data>
+        <record model="ir.ui.view" id="account_invoice_form">
+            <field name="name">account.invoice.form</field>
+            <field name="model">account.invoice</field>
+            <field name="inherit_id" ref="account.invoice_form" />
+            <field name="type">form</field>
+            <field name="arch" type="xml"> 
+                <notebook>
+	                <page string="Factura Electronica Argentina">
+    	                <group col="6" colspan="3">
+		                    <field name="pyafipws_concept"/>
+		                    <field name="pyafipws_billing_start_date"/>					
+                            <field name="pyafipws_billing_end_date"/>
+                        </group>
+                        <button name="do_pyafipws_request_cae" 
+                                    string="Obtener CAE" type="object"/>
+                        <group col="6" colspan="3">                        
+		                    <field name="pyafipws_result"></field>
+		                    <field name="pyafipws_cae"></field>
+		                    <field name="pyafipws_cae_due_date"></field>
+                        </group>
+                        <button name="do_pyafipws_validate_cae" 
+                                    string="Verificar CAE" type="object"/>
+                        <group col="2" colspan="3"> 
+    	                    <field name="pyafipws_message"></field>
+                        </group>
+	                </page>
+                </notebook>
+			</field>  
+        </record>
+    </data>
+</openerp>
+
