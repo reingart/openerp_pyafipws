@@ -72,6 +72,7 @@ class electronic_invoice(osv.osv):
     }
 
     def do_pyafipws_request_cae(self, cr, uid, ids, *args):
+        "Request to AFIP the invoices' Authorization Electronic Code (CAE)"
         for invoice in self.browse(cr, uid, ids):
             # if already authorized (electronic invoice with CAE), ignore
             if invoice.pyafipws_cae:
@@ -223,6 +224,23 @@ class electronic_invoice(osv.osv):
                         'pyafipws_barcode': bars,
                        })
  
+    def action_pyafipws_request_cae(self, cr, uid, ids, *args):
+        "Request to AFIP the invoices' Authorization Electronic Code (CAE)"
+        for i, invoice in enumerate(self.browse(cr, uid, ids)):
+            # request authorization (CAE)
+            self.do_pyafipws_request_cae(cr, uid, ids, *args)
+            # check if an error message was returned 
+            msg = invoice.pyafipws_message
+            if not invoice.pyafipws_cae and msg:
+                # notify the user with an exception message
+                raise osv.except_osv('Error al solicitar CAE AFIP', msg)
+            else:
+                # TODO: use better notification (log not shown in workflow)
+                msg = "CAE: %s Vto.: %s Resultado: %s" 
+                msg = msg % (invoice.pyafipws_cae, 
+                             invoice.pyafipws_cae_due_date,
+                             invoice.pyafipws_result)        
+                self.log(cr, uid, ids[i], msg)
 
     def pyafipws_verification_digit_modulo10(self, codigo):
         "Calculate the verification digit 'modulo 10'"
