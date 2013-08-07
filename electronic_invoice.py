@@ -65,6 +65,7 @@ class electronic_invoice(osv.osv):
             help="Mensaje XML enviado a AFIP (depuración)"),
         'pyafipws_xml_response': fields.text('Respuesta XML', readonly=True,
             help="Mensaje XML recibido de AFIP (depuración)"),
+        'pyafipws_barcode': fields.char('Codigo de Barras', size=40,),
     }
     _defaults = {
          'pyafipws_concept': lambda *a: '1',
@@ -72,13 +73,18 @@ class electronic_invoice(osv.osv):
 
     def do_pyafipws_request_cae(self, cr, uid, ids, *args):
         for invoice in self.browse(cr, uid, ids):
+            # if already authorized (electronic invoice with CAE), ignore
             if invoice.pyafipws_cae:
                 continue
+            # get the electronic invoice type, point of sale and service:
             journal = invoice.journal_id
             company = journal.company_id
             tipo_cbte = journal.pyafipws_invoice_type
             punto_vta = journal.pyafipws_point_of_sale
             service = journal.pyafipws_electronic_invoice_service
+            # check if it is an electronic invoice sale point:
+            if not tipo_cbte or not punto_vta or not service:
+                continue
             # authenticate against AFIP:
             auth_data = company.pyafipws_authenticate(service=service)            
             # import AFIP webservice helper for electronic invoice
@@ -198,6 +204,14 @@ class electronic_invoice(osv.osv):
                                                               sys.exc_value)[0]
             else:
                 msg = u"\n".join([wsfev1.Obs, wsfev1.ErrMsg])
+            # calculate the barcode:
+            if wsfev1.CAE:
+                bars = ''.join([str(wsfev1.Cuit), "%02d" % int(tipo_cbte), 
+                                  "%04d" % int(punto_vta), 
+                                  str(wsfev1.CAE), wsfev1.Vencimiento])
+                bars = bars + self.pyafipws_verification_digit_modulo10(bars)
+            else:
+                bars = ""
             # store the results
             self.write(cr, uid, invoice.id, 
                        {'pyafipws_cae': wsfev1.CAE,
@@ -206,8 +220,30 @@ class electronic_invoice(osv.osv):
                         'pyafipws_message': msg,
                         'pyafipws_xml_request': wsfev1.XmlRequest,
                         'pyafipws_xml_response': wsfev1.XmlResponse,
+                        'pyafipws_barcode': bars,
                        })
  
+
+    def pyafipws_verification_digit_modulo10(self, codigo):
+        "Calculate the verification digit 'modulo 10'"
+        # http://www.consejo.org.ar/Bib_elect/diciembre04_CT/documentos/rafip1702.htm
+        # Step 1: sum all digits in odd positions, left to right
+        codigo = codigo.strip()
+        if not codigo or not codigo.isdigit():
+            return ''
+        etapa1 = sum([int(c) for i,c in enumerate(codigo) if not i%2])
+        # Step 2: multiply the step 1 sum by 3
+        etapa2 = etapa1 * 3
+        # Step 3: start from the left, sum all the digits in even positions
+        etapa3 = sum([int(c) for i,c in enumerate(codigo) if i%2])
+        # Step 4: sum the results of step 2 and 3
+        etapa4 = etapa2 + etapa3
+        # Step 5: the minimun value that summed to step 4 is a multiple of 10
+        digito = 10 - (etapa4 - (int(etapa4 / 10) * 10))
+        if digito == 10:
+            digito = 0
+        return str(digito)
+
 
 electronic_invoice()
 
