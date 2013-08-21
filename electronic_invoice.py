@@ -262,6 +262,32 @@ class electronic_invoice(osv.osv):
             digito = 0
         return str(digito)
 
+    def _get_pyafipws_barcode_img(self, cr, uid, ids, field_name, arg, context):
+        "Generate the required barcode Interleaved of 7 image using PIL"
+        from pyafipws.pyi25 import PyI25
+        from cStringIO import StringIO as StringIO
+        # create the helper:
+        pyi25 = PyI25()
+        images = {}
+        for invoice in self.browse(cr, uid, ids):
+            output = StringIO()
+            # call the helper:
+            bars = invoice.pyafipws_barcode
+            if not bars:
+                bars = "00"
+            pyi25.GenerarImagen(bars, output, extension="PNG")
+            # get the result and encode it for openerp binary field:
+            images[invoice.id] = output.getvalue().encode("base64")
+            output.close()
+        return images
+
+    # add the computed columns:
+    
+    _columns.update({
+        'pyafipws_barcode_img': fields.function( 
+            _get_pyafipws_barcode_img, type='binary', method=True, store=False),
+        })
+
 
 electronic_invoice()
 
