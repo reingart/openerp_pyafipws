@@ -165,7 +165,10 @@ class electronic_invoice(osv.osv):
             # foreign trade data: export permit, country code, etc.:
             incoterms = "FOB"  #TODO
             incoterms_ds = ""
-            permiso_existente = tipo_cbte == 19 and "N" or ""   # not used now
+            if int(tipo_cbte) == 19:
+                permiso_existente =  "N" or "S"     # not used now
+            else:
+                permiso_existente = ""
             obs_generales = invoice.comment
             if invoice.payment_term:
                 forma_pago = invoice.payment_term.name
