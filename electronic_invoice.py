@@ -87,21 +87,32 @@ class electronic_invoice(osv.osv):
             if not tipo_cbte or not punto_vta or not service:
                 continue
             # authenticate against AFIP:
-            auth_data = company.pyafipws_authenticate(service=service)            
+            auth_data = company.pyafipws_authenticate(service=service)
+
             # import AFIP webservice helper for electronic invoice
-            from pyafipws.wsfev1 import WSFEv1
-            wsfev1 = WSFEv1()
+            if service == 'wsfe':
+                from pyafipws.wsfev1 import WSFEv1, SoapFault   # local market
+                ws = WSFEv1()
+            elif service == 'wsfex':
+                from pyafipws.wsfexv1 import WSFEXv1, SoapFault # foreign trade
+                ws = WSFEXv1()
+            else:
+                raise osv.except_osv('Error !', "%s no soportado" % service)
+            
             # connect to the webservice and call to the test method
-            wsfev1.Conectar()
+            ws.Conectar()
             # set AFIP webservice credentials:
-            wsfev1.Cuit = company.pyafipws_cuit
-            wsfev1.Token = auth_data['token']
-            wsfev1.Sign = auth_data['sign']
+            ws.Cuit = company.pyafipws_cuit
+            ws.Token = auth_data['token']
+            ws.Sign = auth_data['sign']
 
             # get the last 8 digit of the invoice number
             cbte_nro = invoice.number[-8:]
             # get the last invoice number registered in AFIP
-            cbte_nro_afip = wsfev1.CompUltimoAutorizado(tipo_cbte, punto_vta)
+            if service == 'wsfe':
+                cbte_nro_afip = ws.CompUltimoAutorizado(tipo_cbte, punto_vta)
+            elif service == 'wsfex':
+                cbte_nro_afip = ws.GetLastCMP(tipo_cbte, punto_vta)
             cbte_nro_next = int(cbte_nro_afip or 0) + 1
             # verify that the invoice is the next one to be registered in AFIP    
             if False and cbte_nro != cbte_nro_next:
@@ -111,11 +122,11 @@ class electronic_invoice(osv.osv):
                         str(invoice.number), str(cbte_nro_next), str(cbte_nro)))
 
             # invoice number range (from - to) and date:
-            cbt_desde = cbt_hasta = cbte_nro_next
+            cbte_nro = cbt_desde = cbt_hasta = cbte_nro_next
             fecha_cbte = invoice.date_invoice.replace("-", "")
 
             # due and billing dates only for concept "services" 
-            concepto = invoice.pyafipws_concept
+            concepto = tipo_expo = invoice.pyafipws_concept
             if int(concepto) != 1:
                 fecha_venc_pago = invoice.date_invoice.strftime("%Y%m%d")
                 fecha_serv_desde = invoice.pyafipws_billing_start_date.replace("-", "")
@@ -124,7 +135,10 @@ class electronic_invoice(osv.osv):
                 fecha_venc_pago = fecha_serv_desde = fecha_serv_hasta = None
 
             # customer tax number:
-            nro_doc = invoice.partner_id.vat.replace("-","")
+            if invoice.partner_id.vat:
+                nro_doc = invoice.partner_id.vat.replace("-","")
+            else:
+                nro_doc = "0"               # only "consumidor final"
             if nro_doc.startswith("AR"):
                 nro_doc = nro_doc[2:]
             if int(nro_doc)  == 0:
@@ -148,65 +162,129 @@ class electronic_invoice(osv.osv):
                 moneda_id = {'USD':'DOL'}[invoice.currency_id.name]
                 moneda_ctz = str(invoice.currency_id.rate)
 
-            # create the invoice internally in the helper 
-            wsfev1.CrearFactura(concepto, tipo_doc, nro_doc, tipo_cbte, punto_vta,
-                cbt_desde, cbt_hasta, imp_total, imp_tot_conc, imp_neto,
-                imp_iva, imp_trib, imp_op_ex, fecha_cbte, fecha_venc_pago, 
-                fecha_serv_desde, fecha_serv_hasta,
-                moneda_id, moneda_ctz)
+            # foreign trade data: export permit, country code, etc.:
+            incoterms = "FOB"  #TODO
+            incoterms_ds = ""
+            permiso_existente = tipo_cbte == 19 and "N" or ""   # not used now
+            obs_generales = invoice.comment
+            if invoice.payment_term:
+                forma_pago = invoice.payment_term.name
+                obs_comerciales = invoice.payment_term.name
+            else:
+                forma_pago = obs_comerciales = None
+            idioma_cbte = 1     # invoice language: spanish / español
+
+            # customer data (foreign trade):
+            nombre_cliente = invoice.partner_id.name
+            id_impositivo = invoice.partner_id.vat or None
+            if invoice.address_invoice_id:
+                domicilio_cliente = " - ".join([
+                                    invoice.address_invoice_id.name or '',
+                                    invoice.address_invoice_id.street or '',
+                                    invoice.address_invoice_id.street2 or '',
+                                    invoice.address_invoice_id.zip or '',
+                                    invoice.address_invoice_id.city or '',
+                                    ])
+            else:
+                domicilio_cliente = ""
+            if invoice.address_invoice_id.country_id:
+                # map ISO country code to AFIP destination country code:
+                pais_dst_cmp = {
+                    'ar': 200, 'bo': 202, 'br': 203, 'ca': 204, 'co': 205, 
+                    'cu': 207, 'cl': 208, 'ec': 210, 'us': 212, 'mx': 218, 
+                    'py': 221, 'pe': 222, 'uy': 225, 've': 226, 'cn': 310, 
+                    'tw': 313, 'in': 315, 'il': 319, 'jp': 320, 'at': 405,
+                    'be': 406, 'dk': 409, 'es': 410, 'fr': 412, 'gr': 413, 
+                    'it': 417, 'nl': 423, 'pt': 620, 'uk': 426, 'sz': 430, 
+                    'de': 438, 'ru': 444, 'eu': 497,
+                    }[invoice.address_invoice_id.country_id.code.lower()]
+                cuit_pais_cliente = None
+
+            # create the invoice internally in the helper
+            if service == 'wsfe':
+                ws.CrearFactura(concepto, tipo_doc, nro_doc, tipo_cbte, punto_vta,
+                    cbt_desde, cbt_hasta, imp_total, imp_tot_conc, imp_neto,
+                    imp_iva, imp_trib, imp_op_ex, fecha_cbte, fecha_venc_pago, 
+                    fecha_serv_desde, fecha_serv_hasta,
+                    moneda_id, moneda_ctz)
+            elif service == 'wsfex':
+                ws.CrearFactura(tipo_cbte, punto_vta, cbte_nro, fecha_cbte,
+                    imp_total, tipo_expo, permiso_existente, pais_dst_cmp, 
+                    nombre_cliente, cuit_pais_cliente, domicilio_cliente,
+                    id_impositivo, moneda_id, moneda_ctz, obs_comerciales, 
+                    obs_generales, forma_pago, incoterms, 
+                    idioma_cbte, incoterms_ds
+                    )
 
             # analyze VAT (IVA) and other taxes (tributo):
-            for tax_line in invoice.tax_line:
-                if "IVA" in tax_line.name:
-                    if '0%' in tax_line.name:
-                        iva_id = 3
-                    elif '10,5%' in tax_line.name:
-                        iva_id = 4
-                    elif '21%' in tax_line.name:
-                        iva_id = 5
-                    elif '27%' in tax_line.name:
-                        iva_id = 6
+            if service in ('wsfe', 'wsmtx'):
+                for tax_line in invoice.tax_line:
+                    if "IVA" in tax_line.name:
+                        if '0%' in tax_line.name:
+                            iva_id = 3
+                        elif '10,5%' in tax_line.name:
+                            iva_id = 4
+                        elif '21%' in tax_line.name:
+                            iva_id = 5
+                        elif '27%' in tax_line.name:
+                            iva_id = 6
+                        else:
+                            ivva_id = 0
+                        base_imp = ("%.2f" % abs(tax_line.base))
+                        importe = ("%.2f" % abs(tax_line.amount))
+                        # add the vat detail in the helper
+                        ws.AgregarIva(iva_id, base_imp, importe)
                     else:
-                        ivva_id = 0
-                    base_imp = ("%.2f" % abs(tax_line.base))
-                    importe = ("%.2f" % abs(tax_line.amount))
-                    # add the vat detail in the helper
-                    wsfev1.AgregarIva(iva_id, base_imp, importe)
-                else:
-                    if 'impuesto' in tax_line.name.lower():
-                        tributo_id = 1  # nacional
-                    elif 'iibbb' in tax_line.name.lower():
-                        tributo_id = 3  # provincial
-                    elif 'tasa' in tax_line.name.lower():
-                        tributo_id = 4  # municipal
-                    else:
-                        tributo_id = 99
-                    desc = tax_line.name
-                    base_imp = ("%.2f" % abs(tax_line.base))
-                    importe = ("%.2f" % abs(tax_line.amount))
-                    alic = "%.2f" % tax_line.base
-                    # add the other tax detail in the helper
-                    wsfev1.AgregarTributo(id, desc, base_imp, alic, importe)                    
+                        if 'impuesto' in tax_line.name.lower():
+                            tributo_id = 1  # nacional
+                        elif 'iibbb' in tax_line.name.lower():
+                            tributo_id = 3  # provincial
+                        elif 'tasa' in tax_line.name.lower():
+                            tributo_id = 4  # municipal
+                        else:
+                            tributo_id = 99
+                        desc = tax_line.name
+                        base_imp = ("%.2f" % abs(tax_line.base))
+                        importe = ("%.2f" % abs(tax_line.amount))
+                        alic = "%.2f" % tax_line.base
+                        # add the other tax detail in the helper
+                        ws.AgregarTributo(id, desc, base_imp, alic, importe)                    
 
+            # analize line items - invoice detail
+            if service in ('wsfex', 'wsmtxca'):
+                for line in invoice.invoice_line:
+                    codigo = line.product_id.code
+                    #cod_mtx = line.product_id.ean13
+                    ds = line.name
+                    qty = line.quantity
+                    umed = 7 # unit - line.uos_id.name
+                    precio = line.price_unit
+                    importe = line.price_subtotal
+                    bonif = line.discount or None
+                    ws.AgregarItem(codigo, ds, qty, umed, precio, importe, bonif)
+            
             # Request the authorization! (call AFIP webservice method)
-            try:    
-                wsfev1.CAESolicitar()
+            try:
+                if service == 'wsfe':
+                    ws.CAESolicitar()
+                elif service == 'wsfex':
+                    ws.Authorize()
             except SoapFault as fault:
                 print fault.faultcode
                 print fault.faultstring
                 msg = 'Falla SOAP %s: %s' % (fault.faultcode, fault.faultstring)
             except Exception, e:
-                if wsaa.Excepcion:
+                if ws.Excepcion:
                     # get the exception already parsed by the helper
-                    msg = wsfev1.Excepcion
+                    msg = ws.Excepcion
                 else:
                     # avoid encoding problem when reporting exceptions to the user:
                     msg = traceback.format_exception_only(sys.exc_type, 
-                                                              sys.exc_value)[0]
+                                                          sys.exc_value)[0]
             else:
                 msg = u"\n".join([wsfev1.Obs, wsfev1.ErrMsg])
             # calculate the barcode:
-            if wsfev1.CAE:
+            if ws.CAE:
                 bars = ''.join([str(wsfev1.Cuit), "%02d" % int(tipo_cbte), 
                                   "%04d" % int(punto_vta), 
                                   str(wsfev1.CAE), wsfev1.Vencimiento])
@@ -215,12 +293,12 @@ class electronic_invoice(osv.osv):
                 bars = ""
             # store the results
             self.write(cr, uid, invoice.id, 
-                       {'pyafipws_cae': wsfev1.CAE,
-                        'pyafipws_cae_due_date': wsfev1.Vencimiento,
-                        'pyafipws_result': wsfev1.Resultado,
+                       {'pyafipws_cae': ws.CAE,
+                        'pyafipws_cae_due_date': ws.Vencimiento,
+                        'pyafipws_result': ws.Resultado,
                         'pyafipws_message': msg,
-                        'pyafipws_xml_request': wsfev1.XmlRequest,
-                        'pyafipws_xml_response': wsfev1.XmlResponse,
+                        'pyafipws_xml_request': ws.XmlRequest,
+                        'pyafipws_xml_response': ws.XmlResponse,
                         'pyafipws_barcode': bars,
                        })
  
