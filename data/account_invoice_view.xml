@@ -9,21 +9,24 @@
             <field name="arch" type="xml"> 
                 <notebook>
 	                <page string="Factura Electronica Argentina">
-    	                <group col="6" colspan="3">
+    	                <group col="8" colspan="4">
 		                    <field name="pyafipws_concept"/>
 		                    <field name="pyafipws_billing_start_date"/>					
                             <field name="pyafipws_billing_end_date"/>
+                            <field name="pyafipws_incoterms"/>
                         </group>
-                        <button name="do_pyafipws_request_cae" 
-                                    string="Obtener CAE" type="object"/>
-                        <group col="6" colspan="3">                        
+                        <group col="6" colspan="3">
 		                    <field name="pyafipws_result"></field>
 		                    <field name="pyafipws_cae"></field>
 		                    <field name="pyafipws_cae_due_date"></field>
                         </group>
-                        <button name="do_pyafipws_validate_cae" 
-                                    string="Verificar CAE" type="object"/>
-                        <group col="2" colspan="3"> 
+                        <group col="2" colspan="1">
+                            <button name="do_pyafipws_request_cae" 
+                                        string="Obtener CAE" type="object"/>
+                            <button name="do_pyafipws_validate_cae" 
+                                        string="Verificar CAE" type="object"/>
+                        </group>
+                        <group col="2" colspan="4"> 
     	                    <field name="pyafipws_message"></field>
                         </group>
                         <group col="1" colspan="4">                        

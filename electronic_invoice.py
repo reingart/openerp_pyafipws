@@ -42,12 +42,16 @@ class electronic_invoice(osv.osv):
         'pyafipws_concept': fields.selection([
                         ('1','1-Productos'),
                         ('2','2-Servicios'),
-                        ('3','3-Productos y Servicios'),
-                        ], 'Concepto', select=True, required=True),
-        'pyafipws_billing_start_date': fields.date('Inicio período facturado',
+                        ('3','3-Productos y Servicios (Nac.)'),
+                        ('4','4-Otros (Exportación)'),
+                        ], 'Concepto', 
+            select=True, required=True, ),
+        'pyafipws_billing_start_date': fields.date('Inicio período',
             help="Seleccionar fecha de fin de servicios - Sólo servicios"),
-        'pyafipws_billing_end_date': fields.date('Fin del período facturado',
+        'pyafipws_billing_end_date': fields.date('Fin del período',
             help="Seleccionar fecha de inicio de servicios - Sólo servicios"),
+        'pyafipws_incoterms': fields.many2one('stock.incoterms', 'INCOTERMS', 
+            help="Términos de comercio internacional (Exportación)"),
         'pyafipws_result': fields.selection([
                 ('', 'n/a'),
                 ('A', 'Aceptado'),
@@ -65,7 +69,8 @@ class electronic_invoice(osv.osv):
             help="Mensaje XML enviado a AFIP (depuración)"),
         'pyafipws_xml_response': fields.text('Respuesta XML', readonly=True,
             help="Mensaje XML recibido de AFIP (depuración)"),
-        'pyafipws_barcode': fields.char('Codigo de Barras', size=40,),
+        'pyafipws_barcode': fields.char('Codigo de Barras', size=40, 
+            help="Código de barras para usar en la impresión", readonly=True,),
     }
     _defaults = {
          'pyafipws_concept': lambda *a: '1',
@@ -164,8 +169,11 @@ class electronic_invoice(osv.osv):
                 moneda_ctz = str(invoice.currency_id.rate)
 
             # foreign trade data: export permit, country code, etc.:
-            incoterms = "FOB"  #TODO
-            incoterms_ds = ""
+            if invoice.pyafipws_incoterms:
+                incoterms = invoice.pyafipws_incoterms.code
+                incoterms_ds = invoice.pyafipws_incoterms.name
+            else:
+                incoterms = incoterms_ds = None
             if int(tipo_cbte) == 19:
                 permiso_existente =  "N" or "S"     # not used now
             else:
