@@ -137,9 +137,15 @@ class electronic_invoice(osv.osv):
             # due and billing dates only for concept "services" 
             concepto = tipo_expo = invoice.pyafipws_concept
             if int(concepto) != 1:
-                fecha_venc_pago = invoice.date_invoice.strftime("%Y%m%d")
-                fecha_serv_desde = invoice.pyafipws_billing_start_date.replace("-", "")
-                fecha_serv_hasta = invoice.pyafipws_billing_end_date.replace("-", "")
+                fecha_venc_pago = invoice.date_invoice.replace("-", "")
+                if invoice.pyafipws_billing_start_date:
+                    fecha_serv_desde = invoice.pyafipws_billing_start_date.replace("-", "")
+                else:
+                    fecha_serv_desde = None
+                if  invoice.pyafipws_billing_end_date:
+                    fecha_serv_hasta = invoice.pyafipws_billing_end_date.replace("-", "")
+                else:
+                    fecha_serv_hasta = None
             else:
                 fecha_venc_pago = fecha_serv_desde = fecha_serv_hasta = None
 
@@ -178,7 +184,7 @@ class electronic_invoice(osv.osv):
                 incoterms_ds = invoice.pyafipws_incoterms.name
             else:
                 incoterms = incoterms_ds = None
-            if int(tipo_cbte) == 19:
+            if int(tipo_cbte) == 19 and tipo_expo == 1:
                 permiso_existente =  "N" or "S"     # not used now
             else:
                 permiso_existente = ""
