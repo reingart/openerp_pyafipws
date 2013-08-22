@@ -268,7 +268,7 @@ class electronic_invoice(osv.osv):
                 if service == 'wsfe':
                     ws.CAESolicitar()
                 elif service == 'wsfex':
-                    ws.Authorize()
+                    ws.Authorize(invoice.id)
             except SoapFault as fault:
                 print fault.faultcode
                 print fault.faultstring
@@ -282,19 +282,19 @@ class electronic_invoice(osv.osv):
                     msg = traceback.format_exception_only(sys.exc_type, 
                                                           sys.exc_value)[0]
             else:
-                msg = u"\n".join([wsfev1.Obs, wsfev1.ErrMsg])
+                msg = u"\n".join([ws.Obs, ws.ErrMsg])
             # calculate the barcode:
             if ws.CAE:
-                bars = ''.join([str(wsfev1.Cuit), "%02d" % int(tipo_cbte), 
+                bars = ''.join([str(ws.Cuit), "%02d" % int(tipo_cbte), 
                                   "%04d" % int(punto_vta), 
-                                  str(wsfev1.CAE), wsfev1.Vencimiento])
+                                  str(ws.CAE), ws.Vencimiento])
                 bars = bars + self.pyafipws_verification_digit_modulo10(bars)
             else:
                 bars = ""
             # store the results
             self.write(cr, uid, invoice.id, 
                        {'pyafipws_cae': ws.CAE,
-                        'pyafipws_cae_due_date': ws.Vencimiento,
+                        'pyafipws_cae_due_date': ws.Vencimiento or None,
                         'pyafipws_result': ws.Resultado,
                         'pyafipws_message': msg,
                         'pyafipws_xml_request': ws.XmlRequest,
