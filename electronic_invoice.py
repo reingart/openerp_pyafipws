@@ -135,7 +135,7 @@ class electronic_invoice(osv.osv):
             fecha_cbte = invoice.date_invoice.replace("-", "")
 
             # due and billing dates only for concept "services" 
-            concepto = tipo_expo = invoice.pyafipws_concept
+            concepto = tipo_expo = int(invoice.pyafipws_concept or 0)
             if int(concepto) != 1:
                 fecha_venc_pago = invoice.date_invoice.replace("-", "")
                 if invoice.pyafipws_billing_start_date:
