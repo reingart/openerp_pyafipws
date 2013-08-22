@@ -297,12 +297,14 @@ class electronic_invoice(osv.osv):
                     msg = traceback.format_exception_only(sys.exc_type, 
                                                           sys.exc_value)[0]
             else:
-                msg = u"\n".join([ws.Obs, ws.ErrMsg])
+                msg = u"\n".join([ws.Obs or "", ws.ErrMsg or ""])
             # calculate the barcode:
             if ws.CAE:
+                cae_due = ''.join([c for c in str(ws.Vencimiento or '') 
+                                           if c.isdigit()])
                 bars = ''.join([str(ws.Cuit), "%02d" % int(tipo_cbte), 
                                   "%04d" % int(punto_vta), 
-                                  str(ws.CAE), ws.Vencimiento])
+                                  str(ws.CAE), cae_due])
                 bars = bars + self.pyafipws_verification_digit_modulo10(bars)
             else:
                 bars = ""
@@ -363,9 +365,11 @@ class electronic_invoice(osv.osv):
         pyi25 = PyI25()
         images = {}
         for invoice in self.browse(cr, uid, ids):
+            if not invoice.pyafipws_barcode:
+                continue
             output = StringIO()
             # call the helper:
-            bars = invoice.pyafipws_barcode
+            bars = ''.join([c for c in invoice.pyafipws_barcode if c.isdigit()])
             if not bars:
                 bars = "00"
             pyi25.GenerarImagen(bars, output, extension="PNG")
