@@ -139,14 +139,15 @@ class electronic_invoice(osv.osv):
                 nro_doc = invoice.partner_id.vat.replace("-","")
             else:
                 nro_doc = "0"               # only "consumidor final"
+            tipo_doc = None
             if nro_doc.startswith("AR"):
                 nro_doc = nro_doc[2:]
-            if int(nro_doc)  == 0:
-                tipo_doc = 99           # consumidor final
-            elif len(nro_doc) < 11:
-                tipo_doc = 96           # DNI
-            else:
-                tipo_doc = 80           # CUIT
+                if int(nro_doc)  == 0:
+                    tipo_doc = 99           # consumidor final
+                elif len(nro_doc) < 11:
+                    tipo_doc = 96           # DNI
+                else:
+                    tipo_doc = 80           # CUIT
 
             # invoice amount totals:
             imp_total = str("%.2f" % abs(invoice.amount_total))
@@ -179,7 +180,18 @@ class electronic_invoice(osv.osv):
 
             # customer data (foreign trade):
             nombre_cliente = invoice.partner_id.name
-            id_impositivo = invoice.partner_id.vat or None
+            if invoice.partner_id.vat:
+                if invoice.partner_id.vat.startswith("AR"):
+                    # use the Argentina AFIP's global CUIT for the country:
+                    cuit_pais_cliente = invoice.partner_id.vat[2:]
+                    id_impositivo = None
+                else:
+                    # use the VAT number directly
+                    id_impositivo = invoice.partner_id.vat[2:] 
+                    # TODO: the prefix could be used to map the customer country
+                    cuit_pais_cliente = None
+            else:
+                cuit_pais_cliente = id_impositivo = None
             if invoice.address_invoice_id:
                 domicilio_cliente = " - ".join([
                                     invoice.address_invoice_id.name or '',
@@ -201,7 +213,7 @@ class electronic_invoice(osv.osv):
                     'it': 417, 'nl': 423, 'pt': 620, 'uk': 426, 'sz': 430, 
                     'de': 438, 'ru': 444, 'eu': 497,
                     }[invoice.address_invoice_id.country_id.code.lower()]
-                cuit_pais_cliente = None
+                
 
             # create the invoice internally in the helper
             if service == 'wsfe':
