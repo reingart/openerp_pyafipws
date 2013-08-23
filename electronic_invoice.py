@@ -135,18 +135,26 @@ class electronic_invoice(osv.osv):
 
             # invoice number range (from - to) and date:
             cbte_nro = cbt_desde = cbt_hasta = cbte_nro_next
-            fecha_cbte = invoice.date_invoice.replace("-", "")
+            fecha_cbte = invoice.date_invoice
+            if service != 'wsmtxca':
+                fecha_cbte = fecha_cbte.replace("-", "")
 
             # due and billing dates only for concept "services" 
             concepto = tipo_expo = int(invoice.pyafipws_concept or 0)
             if int(concepto) != 1:
-                fecha_venc_pago = invoice.date_invoice.replace("-", "")
+                fecha_venc_pago = invoice.date_invoice
+                if service != 'wsmtxca':
+                        fecha_venc_pago = fecha_venc_pago.replace("-", "")
                 if invoice.pyafipws_billing_start_date:
-                    fecha_serv_desde = invoice.pyafipws_billing_start_date.replace("-", "")
+                    fecha_serv_desde = invoice.pyafipws_billing_start_date
+                    if service != 'wsmtxca':
+                        fecha_serv_desde = fecha_serv_desde.replace("-", "")
                 else:
                     fecha_serv_desde = None
                 if  invoice.pyafipws_billing_end_date:
-                    fecha_serv_hasta = invoice.pyafipws_billing_end_date.replace("-", "")
+                    fecha_serv_hasta = invoice.pyafipws_billing_end_date
+                    if service != 'wsmtxca':
+                        fecha_serv_desde = fecha_serv_desde.replace("-", "")
                 else:
                     fecha_serv_hasta = None
             else:
