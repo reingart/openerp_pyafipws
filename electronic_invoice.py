@@ -98,10 +98,13 @@ class electronic_invoice(osv.osv):
             # authenticate against AFIP:
             auth_data = company.pyafipws_authenticate(service=service)
 
-            # import AFIP webservice helper for electronic invoice
+            # import the AFIP webservice helper for electronic invoice
             if service == 'wsfe':
                 from pyafipws.wsfev1 import WSFEv1, SoapFault   # local market
                 ws = WSFEv1()
+            elif service == 'wsmtxca':
+                from pyafipws.wsmtx import WSMTXCA, SoapFault   # local + detail
+                ws = WSMTXCA()
             elif service == 'wsfex':
                 from pyafipws.wsfexv1 import WSFEXv1, SoapFault # foreign trade
                 ws = WSFEXv1()
@@ -118,7 +121,7 @@ class electronic_invoice(osv.osv):
             # get the last 8 digit of the invoice number
             cbte_nro = invoice.number[-8:]
             # get the last invoice number registered in AFIP
-            if service == 'wsfe':
+            if service == "wsfe" or service == "wsmtxca":
                 cbte_nro_afip = ws.CompUltimoAutorizado(tipo_cbte, punto_vta)
             elif service == 'wsfex':
                 cbte_nro_afip = ws.GetLastCMP(tipo_cbte, punto_vta)
@@ -169,6 +172,7 @@ class electronic_invoice(osv.osv):
             imp_tot_conc = "0.00"
             imp_neto = str("%.2f" % abs(invoice.amount_untaxed))
             imp_iva = str("%.2f" % abs(invoice.amount_tax))
+            imp_subtotal = imp_neto  # TODO: not allways the case!
             imp_trib = "0.00"
             imp_op_ex = "0.00"
             if invoice.currency_id.name == 'ARS':                
@@ -240,17 +244,22 @@ class electronic_invoice(osv.osv):
                     imp_iva, imp_trib, imp_op_ex, fecha_cbte, fecha_venc_pago, 
                     fecha_serv_desde, fecha_serv_hasta,
                     moneda_id, moneda_ctz)
+            elif service == 'wsmtxca':
+                ws.CrearFactura(concepto, tipo_doc, nro_doc, tipo_cbte, punto_vta,
+                    cbt_desde, cbt_hasta, imp_total, imp_tot_conc, imp_neto,
+                    imp_subtotal, imp_trib, imp_op_ex, fecha_cbte, 
+                    fecha_venc_pago, fecha_serv_desde, fecha_serv_hasta,
+                    moneda_id, moneda_ctz, obs_generales)
             elif service == 'wsfex':
                 ws.CrearFactura(tipo_cbte, punto_vta, cbte_nro, fecha_cbte,
                     imp_total, tipo_expo, permiso_existente, pais_dst_cmp, 
                     nombre_cliente, cuit_pais_cliente, domicilio_cliente,
                     id_impositivo, moneda_id, moneda_ctz, obs_comerciales, 
                     obs_generales, forma_pago, incoterms, 
-                    idioma_cbte, incoterms_ds
-                    )
+                    idioma_cbte, incoterms_ds)
 
             # analyze VAT (IVA) and other taxes (tributo):
-            if service in ('wsfe', 'wsmtx'):
+            if service in ('wsfe', 'wsmtxca'):
                 for tax_line in invoice.tax_line:
                     if "IVA" in tax_line.name:
                         if '0%' in tax_line.name:
@@ -296,15 +305,15 @@ class electronic_invoice(osv.osv):
                     bonif = line.discount or None
                     ws.AgregarItem(codigo, ds, qty, umed, precio, importe, bonif)
             
-            # Request the authorization! (call AFIP webservice method)
+            # Request the authorization! (call the AFIP webservice method)
             try:
                 if service == 'wsfe':
                     ws.CAESolicitar()
+                elif service == 'wsmtxca':
+                    ws.AutorizarComprobante()
                 elif service == 'wsfex':
                     ws.Authorize(invoice.id)
             except SoapFault as fault:
-                print fault.faultcode
-                print fault.faultstring
                 msg = 'Falla SOAP %s: %s' % (fault.faultcode, fault.faultstring)
             except Exception, e:
                 if ws.Excepcion:
