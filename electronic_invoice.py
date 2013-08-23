@@ -304,14 +304,22 @@ class electronic_invoice(osv.osv):
             if service in ('wsfex', 'wsmtxca'):
                 for line in invoice.invoice_line:
                     codigo = line.product_id.code
-                    #cod_mtx = line.product_id.ean13
+                    u_mtx = 1                       # TODO: get it from uom? 
+                    cod_mtx = line.product_id.ean13
                     ds = line.name
                     qty = line.quantity
-                    umed = 7 # unit - line.uos_id.name
+                    umed = 7                        # TODO: line.uos_id...?
                     precio = line.price_unit
                     importe = line.price_subtotal
                     bonif = line.discount or None
-                    ws.AgregarItem(codigo, ds, qty, umed, precio, importe, bonif)
+                    iva_id = 5                      # TODO: line.tax_code_id?
+                    imp_iva = importe * line.invoice_line_tax_id[0].amount
+                    if service == 'wsmtxca':
+                        ws.AgregarItem(u_mtx, cod_mtx, codigo, ds, qty, umed, 
+                                precio, bonif, iva_id, imp_iva, importe+imp_iva)
+                    elif service == 'wsfex':
+                        ws.AgregarItem(codigo, ds, qty, umed, precio, importe, 
+                                bonif)
             
             # Request the authorization! (call the AFIP webservice method)
             try:
