@@ -37,7 +37,8 @@ CACHE = ""                  # cache folder path, use default
 DEBUG = False
 
 
-def authenticate(service, certificate, private_key, force=False):
+def authenticate(service, certificate, private_key, force=False,
+                 cache=CACHE, wsdl=WSAA_URL, proxy=PROXY, ):
     "Call AFIP Authentication webservice to get token & sign or error message"
     
     # import AFIP webservice authentication helper:
@@ -49,7 +50,10 @@ def authenticate(service, certificate, private_key, force=False):
     
     # make md5 hash of the parameter for caching... 
     fn = "%s.xml" % hashlib.md5(service + certificate + private_key).hexdigest()
-    fn = os.path.join(wsaa.InstallDir, "cache", fn)
+    if cache:
+        fn = os.path.join(cache, fn)
+    else:
+        fn = os.path.join(wsaa.InstallDir, "cache", fn)
 
     try:
         # read the access ticket (if already authenticated)
@@ -60,7 +64,7 @@ def authenticate(service, certificate, private_key, force=False):
             # cryptographically sing the access ticket
             cms = wsaa.SignTRA(tra, certificate, private_key)
             # connect to the webservice:
-            wsaa.Conectar(CACHE, WSAA_URL, PROXY)
+            wsaa.Conectar(cache, wsdl, proxy)
             # call the remote method 
             ta = wsaa.LoginCMS(cms)
             # write the access ticket for further consumption
