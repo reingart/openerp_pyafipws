@@ -127,7 +127,7 @@ class electronic_invoice(osv.osv):
             ws.Sign = auth_data['sign']
 
             # get the last 8 digit of the invoice number
-            cbte_nro = invoice.number[-8:]
+            cbte_nro = int(invoice.number[-8:])
             # get the last invoice number registered in AFIP
             if service == "wsfe" or service == "wsmtxca":
                 cbte_nro_afip = ws.CompUltimoAutorizado(tipo_cbte, punto_vta)
@@ -135,7 +135,7 @@ class electronic_invoice(osv.osv):
                 cbte_nro_afip = ws.GetLastCMP(tipo_cbte, punto_vta)
             cbte_nro_next = int(cbte_nro_afip or 0) + 1
             # verify that the invoice is the next one to be registered in AFIP    
-            if False and cbte_nro != cbte_nro_next:
+            if cbte_nro != cbte_nro_next:
                 raise osv.except_osv('Error !', 
                         'Referencia: %s \n' 
                         'El número del comprobante debería ser %s y no %s' % (
