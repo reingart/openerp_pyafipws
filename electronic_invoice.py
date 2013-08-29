@@ -80,7 +80,7 @@ class electronic_invoice(osv.osv):
          'pyafipws_concept': lambda *a: '1',
     }
 
-    def do_pyafipws_request_cae(self, cr, uid, ids, *args):
+    def do_pyafipws_request_cae(self, cr, uid, ids, context=None, *args):
         "Request to AFIP the invoices' Authorization Electronic Code (CAE)"
         for invoice in self.browse(cr, uid, ids):
             # if already authorized (electronic invoice with CAE), ignore
@@ -98,21 +98,29 @@ class electronic_invoice(osv.osv):
             # authenticate against AFIP:
             auth_data = company.pyafipws_authenticate(service=service)
 
+            # create the proxy and get the configuration system parameters:
+            cfg = self.pool.get('ir.config_parameter')
+            cache = cfg.get_param(cr, uid, 'pyafipws.cache', context=context)
+            proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
+            wsdl = cfg.get_param(cr, uid, 'pyafipws.%s.url' % service, context=context)
+            
             # import the AFIP webservice helper for electronic invoice
             if service == 'wsfe':
                 from pyafipws.wsfev1 import WSFEv1, SoapFault   # local market
                 ws = WSFEv1()
             elif service == 'wsmtxca':
                 from pyafipws.wsmtx import WSMTXCA, SoapFault   # local + detail
+                wsdl = cfg.get_param(cr, uid, 'pyafipws.wsmtxca.url', context=context)
                 ws = WSMTXCA()
             elif service == 'wsfex':
                 from pyafipws.wsfexv1 import WSFEXv1, SoapFault # foreign trade
+                wsdl = cfg.get_param(cr, uid, 'pyafipws.wsfex.url', context=context)
                 ws = WSFEXv1()
             else:
                 raise osv.except_osv('Error !', "%s no soportado" % service)
             
             # connect to the webservice and call to the test method
-            ws.Conectar()
+            ws.Conectar(cache or "", wsdl or "", proxy or "")
             # set AFIP webservice credentials:
             ws.Cuit = company.pyafipws_cuit
             ws.Token = auth_data['token']
