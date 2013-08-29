@@ -67,6 +67,8 @@ def authenticate(service, certificate, private_key, force=False,
             wsaa.Conectar(cache, wsdl, proxy)
             # call the remote method 
             ta = wsaa.LoginCMS(cms)
+            if not ta:
+                raise RuntimeError()
             # write the access ticket for further consumption
             open(fn, "w").write(ta)
         else:
