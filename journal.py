@@ -81,8 +81,13 @@ class journal_pyafipws_electronic_invoice(osv.osv):
             elif service == "wsmtxca":
                 from pyafipws.wsmtx import WSMTXCA
                 ws = WSMTXCA()
+            # create the proxy and get the configuration system parameters:
+            cfg = self.pool.get('ir.config_parameter')
+            cache = cfg.get_param(cr, uid, 'pyafipws.cache', context=context)
+            proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
+            wsdl = cfg.get_param(cr, uid, 'pyafipws.%s.url' % service, context=context)
             # connect to the webservice and call to the test method
-            ws.Conectar()
+            ws.Conectar(cache or "", wsdl or "", proxy or "")
             ws.Dummy()
             msg = "AFIP service %s " \
                   "AppServerStatus: %s DbServerStatus: %s AuthServerStatus: %s" 
@@ -105,8 +110,13 @@ class journal_pyafipws_electronic_invoice(osv.osv):
             # import AFIP webservice helper for electronic invoice
             from pyafipws.wsfev1 import WSFEv1
             wsfev1 = WSFEv1()
+            # create the proxy and get the configuration system parameters:
+            cfg = self.pool.get('ir.config_parameter')
+            cache = cfg.get_param(cr, uid, 'pyafipws.cache', context=context)
+            proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
+            wsdl = cfg.get_param(cr, uid, 'pyafipws.%s.url' % service, context=context)
             # connect to the webservice and call to the test method
-            wsfev1.Conectar()
+            ws.Conectar(cache or "", wsdl or "", proxy or "")
             # set AFIP webservice credentials:
             wsfev1.Cuit = company.pyafipws_cuit
             wsfev1.Token = auth_data['token']
@@ -138,8 +148,13 @@ class journal_pyafipws_electronic_invoice(osv.osv):
             elif service == "wsmtxca":
                 from pyafipws.wsmtx import WSMTXCA
                 ws = WSMTXCA()
-            # connect to the webservice and call to the test method
-            ws.Conectar()
+            # create the proxy and get the configuration system parameters:
+            cfg = self.pool.get('ir.config_parameter')
+            cache = cfg.get_param(cr, uid, 'pyafipws.cache', context=context)
+            proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
+            wsdl = cfg.get_param(cr, uid, 'pyafipws.%s.url' % service, context=context)
+            # connect to the webservice and call to the query method
+            ws.Conectar(cache or "", wsdl or "", proxy or "")
             if auth_data['token']:
                 # set AFIP webservice credentials:
                 ws.Cuit = company.pyafipws_cuit
