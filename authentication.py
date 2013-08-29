@@ -47,9 +47,18 @@ class company_pyafipws_credentials(osv.osv):
         import afip_auth
         auth_data = {}
         for company in self.browse(cr, uid, ids):
+            # get the authentication credentials:
             certificate = str(company.pyafipws_certificate)
             private_key = str(company.pyafipws_private_key)
-            auth = afip_auth.authenticate(service, certificate, private_key)
+            # create the proxy and get the configuration system parameters:
+            cfg = self.pool.get('ir.config_parameter')
+            cache = cfg.get_param(cr, uid, 'pyafipws.cache', context=context)
+            proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
+            wsdl = cfg.get_param(cr, uid, 'pyafipws.wsaa.url', context=context)
+            # call the helper function to obtain the access ticket:
+            auth = afip_auth.authenticate(service, certificate, private_key,
+                                          cache=cache or "", wsdl=wsdl or "", 
+                                          proxy=proxy or "")
             auth_data.update(auth)
         return auth_data
 
