@@ -116,7 +116,7 @@ class journal_pyafipws_electronic_invoice(osv.osv):
             proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
             wsdl = cfg.get_param(cr, uid, 'pyafipws.%s.url' % service, context=context)
             # connect to the webservice and call to the test method
-            ws.Conectar(cache or "", wsdl or "", proxy or "")
+            wsfev1.Conectar(cache or "", wsdl or "", proxy or "")
             # set AFIP webservice credentials:
             wsfev1.Cuit = company.pyafipws_cuit
             wsfev1.Token = auth_data['token']
