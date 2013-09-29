@@ -499,9 +499,10 @@ class invoice_wizard(osv.osv_memory):
             else:
                 if not wiz.cbte_nro:
                     wiz.cbte_nro = ws.GetLastCMP(tipo_cbte, punto_vta)
-                    ws.GetCMP(tipo_cbte, punto_vta, wiz.cbte_nro)
+                ws.GetCMP(tipo_cbte, punto_vta, wiz.cbte_nro)
                 vat = 0
 
+            # update the form fields with the values returned from AFIP:
             self.write(cr, uid, ids, {'cae': ws.CAE, 'cae_due': ws.Vencimiento,
                                       'total': ws.ImpTotal or 0, 'vat': vat,
                                       'cbte_nro': ws.CbteNro,                                    
