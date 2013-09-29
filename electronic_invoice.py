@@ -439,3 +439,28 @@ class electronic_invoice(osv.osv):
 
 electronic_invoice()
 
+
+class invoice_wizard(osv.osv_memory):
+    _name = 'pyafipws.invoice.wizard'
+    _columns = {
+        'tipo_cbte': fields.integer('invoice type'),
+        'punto_vta': fields.integer('point of sale'),
+        'cbte_nro': fields.integer('number'),
+        'cae': fields.char('CAE', size=14, readonly=True, ),
+        'cae_due_date': fields.date('Vencimiento CAE', readonly=True, ),   
+        'total_amount': fields.float('Total', readonly=True, ),
+    }
+    def get(self,cr,uid,ids,context={}):
+        #invoice = self.pool.get('account.invoice')
+        for wiz in self.browse(cr, uid, ids):
+            self.write(cr, uid, ids, {'cae': '1234',}, context=context)
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'pyafipws.invoice.wizard',
+                'view_mode': 'form',
+                'view_type': 'form',
+                'res_id': wiz.id,
+                'views': [(False, 'form')],
+                'target': 'new',
+                 }
+invoice_wizard()

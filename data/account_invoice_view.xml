@@ -23,8 +23,8 @@
                         <group col="2" colspan="1">
                             <button name="do_pyafipws_request_cae" 
                                         string="Obtener CAE" type="object"/>
-                            <button name="do_pyafipws_validate_cae" 
-                                        string="Verificar CAE" type="object"/>
+                            <button name="%(action_pyafipws_invoice_wizard)d" 
+                                        string="Verificar CAE" type="action"/>
                         </group>
                         <group col="2" colspan="4"> 
     	                    <field name="pyafipws_message"></field>
@@ -49,6 +49,34 @@ action_pyafipws_request_cae()
 write({'state':'open'})</field>
             <field name="kind">function</field>
         </record>
+        
+        <record id="wizard_pyafipws_invoice_wizard" model="ir.ui.view">
+            <field name="name">pyafipws.invoice.wizard.form</field>
+            <field name="model">pyafipws.invoice.wizard</field>
+            <field name="type">form</field>
+            <field name="arch" type="xml">
+            <form string="Invoice Wizard">
+                <field name="punto_vta" string="Point of sale"/>
+                <field name="cbte_nro" string="Invoice Number"/>
+                <field name="cae" string="CAE"/>
+                <field name="total_amount" string="Total Amount"/>
+                <group colspan="4">
+                    <button string="Cancel" special="cancel" icon="gtk-cancel"/>
+                    <button string="Query AFIP" name="get" type="object" icon="gtk-ok"/>
+                </group>
+            </form>
+            </field>
+        </record>
+        <record id="action_pyafipws_invoice_wizard" model="ir.actions.act_window">
+            <field name="name">Consultar AFIP</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">pyafipws.invoice.wizard</field>
+            <field name="src_model">account.invoice</field>
+            <field name="view_type">form</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+        
     </data>
 </openerp>
 
