@@ -77,7 +77,14 @@ write({'state':'open'})</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
         </record>
-        
+
+        <report auto="False" header="False" 
+            id="report_pyafipws_account_invoice" 
+            model="account.invoice" 
+            name="pyafipws.invoice"
+            string="PDF Factura Electronica" 
+            report_type="pdf"/>
+
     </data>
 </openerp>
 

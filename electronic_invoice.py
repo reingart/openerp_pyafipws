@@ -23,6 +23,8 @@ __license__ = "AGPL 3.0+"
 
 
 from osv import fields, osv
+from report.interface import report_int
+
 import os, time
 import datetime
 import decimal
@@ -518,3 +520,36 @@ class invoice_wizard(osv.osv_memory):
                  }
 
 invoice_wizard()
+
+
+class report_py(report_int):
+    def __init__(self, name, table, tmpl, xsl):
+        super(report_int, self).__init__(name)
+        self.table = table
+        self.internal_header=False
+        self.tmpl = tmpl
+        self.xsl = xsl
+        self.bin_datas = {}
+        #self.generators = {
+        #    'pdf': self.create_pdf,
+        #}
+
+    def create(self, cr, uid, ids, datas, context):
+        import pooler
+        pool = pooler.get_pool(cr.dbname)
+        active_model = context['active_model']
+        model_obj = pool.get(active_model)
+        obj = model_obj.browse(cr, uid, ids)[0]
+        report_type = datas.get('report_type', 'pdf')
+        pdf = open("/tmp/factura.pdf").read()
+        return (pdf, report_type)
+
+    def _get_path(self):
+        ret = []
+        ret.append(self.tmpl.replace(os.path.sep, '/').rsplit('/',1)[0]) # Same dir as the report rml
+        ret.append('addons')
+        ret.append(tools.config['root_path'])
+        return ret
+        
+report_py('report.pyafipws.invoice', 'account.invoice', '', '',)
+                       
