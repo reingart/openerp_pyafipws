@@ -56,14 +56,15 @@ write({'state':'open'})</field>
             <field name="type">form</field>
             <field name="arch" type="xml">
             <form string="Invoice Wizard">
-                <field name="punto_vta" string="Point of sale"/>
-                <field name="cbte_nro" string="Invoice Number"/>
-                <field name="cae" string="CAE"/>
-                <field name="total_amount" string="Total Amount"/>
-                <group colspan="4">
-                    <button string="Cancel" special="cancel" icon="gtk-cancel"/>
-                    <button string="Query AFIP" name="get" type="object" icon="gtk-ok"/>
+                <field name="journal" string="Journal"/>
+                <group colspan="2">
+                    <field name="cbte_nro" string="Invoice Number"/>
+                    <button string="Get Invoice" name="get" type="object" icon="gtk-ok"/>
                 </group>
+                <field name="cae" string="CAE"/>
+                <field name="cae_due" string="CAE Due"/>
+                <field name="total" string="Total Amount"/>
+                <field name="vat" string="VAT Amount"/>
             </form>
             </field>
         </record>

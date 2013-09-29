@@ -443,17 +443,69 @@ electronic_invoice()
 class invoice_wizard(osv.osv_memory):
     _name = 'pyafipws.invoice.wizard'
     _columns = {
-        'tipo_cbte': fields.integer('invoice type'),
-        'punto_vta': fields.integer('point of sale'),
+        'journal': fields.many2one('account.journal', 'Journal'),
         'cbte_nro': fields.integer('number'),
         'cae': fields.char('CAE', size=14, readonly=True, ),
-        'cae_due_date': fields.date('Vencimiento CAE', readonly=True, ),   
-        'total_amount': fields.float('Total', readonly=True, ),
+        'cae_due': fields.char('Vencimiento CAE', size=10, readonly=True, ),   
+        'total': fields.float('Total', readonly=True, ),
+        'vat': fields.float('IVA', readonly=True, ),
     }
     def get(self,cr,uid,ids,context={}):
         #invoice = self.pool.get('account.invoice')
         for wiz in self.browse(cr, uid, ids):
-            self.write(cr, uid, ids, {'cae': '1234',}, context=context)
+            company = wiz.journal.company_id
+            tipo_cbte = wiz.journal.pyafipws_invoice_type
+            punto_vta = wiz.journal.pyafipws_point_of_sale
+            service = wiz.journal.pyafipws_electronic_invoice_service
+            # check if it is an electronic invoice sale point:
+            if not tipo_cbte or not punto_vta or not service:
+                raise osv.except_osv('Error !', "Solo factura electrónica")
+
+            # authenticate against AFIP:
+            auth_data = company.pyafipws_authenticate(service=service)
+            # create the proxy and get the configuration system parameters:
+            cfg = self.pool.get('ir.config_parameter')
+            cache = cfg.get_param(cr, uid, 'pyafipws.cache', context=context)
+            proxy = cfg.get_param(cr, uid, 'pyafipws.proxy', context=context)
+            wsdl = cfg.get_param(cr, uid, 'pyafipws.%s.url' % service, context=context)
+            
+            # import the AFIP webservice helper for electronic invoice
+            if service == 'wsfe':
+                from pyafipws.wsfev1 import WSFEv1, SoapFault   # local market
+                ws = WSFEv1()
+            elif service == 'wsmtxca':
+                from pyafipws.wsmtx import WSMTXCA, SoapFault   # local + detail
+                wsdl = cfg.get_param(cr, uid, 'pyafipws.wsmtxca.url', context=context)
+                ws = WSMTXCA()
+            elif service == 'wsfex':
+                from pyafipws.wsfexv1 import WSFEXv1, SoapFault # foreign trade
+                wsdl = cfg.get_param(cr, uid, 'pyafipws.wsfex.url', context=context)
+                ws = WSFEXv1()
+            else:
+                raise osv.except_osv('Error !', "%s no soportado" % service)
+            
+            # connect to the webservice and call to the test method
+            ws.Conectar(cache or "", wsdl or "", proxy or "")
+            # set AFIP webservice credentials:
+            ws.Cuit = company.pyafipws_cuit
+            ws.Token = auth_data['token']
+            ws.Sign = auth_data['sign']
+
+            if service in ('wsfe', 'wsmtxca'):
+                if not wiz.cbte_nro:
+                    wiz.cbte_nro = ws.CompUltimoAutorizado(tipo_cbte, punto_vta)
+                ws.CompConsultar(tipo_cbte, punto_vta, wiz.cbte_nro)
+                vat = ws.ImptoLiq
+            else:
+                if not wiz.cbte_nro:
+                    wiz.cbte_nro = ws.GetLastCMP(tipo_cbte, punto_vta)
+                    ws.GetCMP(tipo_cbte, punto_vta, wiz.cbte_nro)
+                vat = 0
+
+            self.write(cr, uid, ids, {'cae': ws.CAE, 'cae_due': ws.Vencimiento,
+                                      'total': ws.ImpTotal or 0, 'vat': vat,
+                                      'cbte_nro': ws.CbteNro,                                    
+                                     }, context=context)
             return {
                 'type': 'ir.actions.act_window',
                 'res_model': 'pyafipws.invoice.wizard',
@@ -463,4 +515,5 @@ class invoice_wizard(osv.osv_memory):
                 'views': [(False, 'form')],
                 'target': 'new',
                  }
+
 invoice_wizard()
