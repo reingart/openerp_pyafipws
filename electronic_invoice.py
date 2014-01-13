@@ -34,7 +34,15 @@ import sys
 import traceback
 
 DEBUG = True
-
+AFIP_COUNTRY_CODE_MAP = {
+                    'ar': 200, 'bo': 202, 'br': 203, 'ca': 204, 'co': 205, 
+                    'cu': 207, 'cl': 208, 'ec': 210, 'us': 212, 'mx': 218, 
+                    'py': 221, 'pe': 222, 'uy': 225, 've': 226, 'cn': 310, 
+                    'tw': 313, 'in': 315, 'il': 319, 'jp': 320, 'at': 405,
+                    'be': 406, 'dk': 409, 'es': 410, 'fr': 412, 'gr': 413, 
+                    'it': 417, 'nl': 423, 'pt': 620, 'uk': 426, 'sz': 430, 
+                    'de': 438, 'ru': 444, 'eu': 497,
+                    }
 
 class electronic_invoice(osv.osv):
     _name = "account.invoice"
@@ -244,15 +252,8 @@ class electronic_invoice(osv.osv):
                 domicilio_cliente = ""
             if invoice.address_invoice_id.country_id:
                 # map ISO country code to AFIP destination country code:
-                pais_dst_cmp = {
-                    'ar': 200, 'bo': 202, 'br': 203, 'ca': 204, 'co': 205, 
-                    'cu': 207, 'cl': 208, 'ec': 210, 'us': 212, 'mx': 218, 
-                    'py': 221, 'pe': 222, 'uy': 225, 've': 226, 'cn': 310, 
-                    'tw': 313, 'in': 315, 'il': 319, 'jp': 320, 'at': 405,
-                    'be': 406, 'dk': 409, 'es': 410, 'fr': 412, 'gr': 413, 
-                    'it': 417, 'nl': 423, 'pt': 620, 'uk': 426, 'sz': 430, 
-                    'de': 438, 'ru': 444, 'eu': 497,
-                    }[invoice.address_invoice_id.country_id.code.lower()]
+                iso_code = invoice.address_invoice_id.country_id.code.lower()
+                pais_dst_cmp = AFIP_COUNTRY_CODE_MAP[iso_code]
                 
 
             # create the invoice internally in the helper
@@ -289,7 +290,7 @@ class electronic_invoice(osv.osv):
                         elif '27%' in tax_line.name:
                             iva_id = 6
                         else:
-                            ivva_id = 0
+                            iva_id = 0
                         base_imp = ("%.2f" % abs(tax_line.base))
                         importe = ("%.2f" % abs(tax_line.amount))
                         # add the vat detail in the helper
@@ -522,34 +523,219 @@ class invoice_wizard(osv.osv_memory):
 invoice_wizard()
 
 
-class report_py(report_int):
-    def __init__(self, name, table, tmpl, xsl):
-        super(report_int, self).__init__(name)
-        self.table = table
-        self.internal_header=False
-        self.tmpl = tmpl
-        self.xsl = xsl
-        self.bin_datas = {}
-        #self.generators = {
-        #    'pdf': self.create_pdf,
-        #}
+class report_pyfepdf(report_int):
+    "Basic PDF template report for Argentina Electronic Invoices (using FPDF)"
 
     def create(self, cr, uid, ids, datas, context):
         import pooler
         pool = pooler.get_pool(cr.dbname)
-        active_model = context['active_model']
-        model_obj = pool.get(active_model)
-        obj = model_obj.browse(cr, uid, ids)[0]
-        report_type = datas.get('report_type', 'pdf')
-        pdf = open("/tmp/factura.pdf").read()
-        return (pdf, report_type)
+        model_obj = pool.get("account.invoice")
+        try:
+            # import and instantiate the helper:
+            from pyafipws.pyfepdf import FEPDF            
+            fepdf = FEPDF()
+            
+            # load CSV default format (factura.csv)
+            fepdf.CargarFormato(os.path.join(os.path.dirname(__file__), 
+                                             "pyafipws", "factura.csv"))
+            # set the logo image
+            fepdf.AgregarDato("logo", os.path.join(os.path.dirname(__file__),
+                                                   "pyafipws", "logo.png"))            
+            # set amount format (decimal places):
+            fepdf.FmtCantidad = "0.2"
+            fepdf.FmtPrecio = "0.2"
 
-    def _get_path(self):
-        ret = []
-        ret.append(self.tmpl.replace(os.path.sep, '/').rsplit('/',1)[0]) # Same dir as the report rml
-        ret.append('addons')
-        ret.append(tools.config['root_path'])
-        return ret
+            # TODO: complete all fields and additional data 
+            for invoice in model_obj.browse(cr, uid, ids)[:1]:
+
+                # get the electronic invoice type, point of sale and service:
+                journal = invoice.journal_id
+                company = journal.company_id
+                tipo_cbte = journal.pyafipws_invoice_type
+                punto_vta = journal.pyafipws_point_of_sale
+
+                # set basic AFIP data:
+                fepdf.CUIT = company.pyafipws_cuit
+
+                # get the last 8 digit of the invoice number
+                cbte_nro = int(invoice.number[-8:])
+                cbt_desde = cbt_hasta = cbte_nro
+                fecha_cbte = invoice.date_invoice
+                concepto = tipo_expo = int(invoice.pyafipws_concept or 0)
+                if int(concepto) != 1:
+                    fecha_venc_pago = invoice.date_invoice
+                    if invoice.pyafipws_billing_start_date:
+                        fecha_serv_desde = invoice.pyafipws_billing_start_date
+                    else:
+                        fecha_serv_desde = None
+                    if  invoice.pyafipws_billing_end_date:
+                        fecha_serv_hasta = invoice.pyafipws_billing_end_date
+                    else:
+                        fecha_serv_hasta = None
+                else:
+                    fecha_venc_pago = fecha_serv_desde = fecha_serv_hasta = None
+
+                # customer tax number:
+                if invoice.partner_id.vat:
+                    nro_doc = invoice.partner_id.vat.replace("-","")
+                else:
+                    nro_doc = "0"               # only "consumidor final"
+                tipo_doc = 99
+                if nro_doc.startswith("AR"):
+                    nro_doc = nro_doc[2:]
+                    if int(nro_doc)  == 0:
+                        tipo_doc = 99           # consumidor final
+                    elif len(nro_doc) < 11:
+                        tipo_doc = 96           # DNI
+                    else:
+                        tipo_doc = 80           # CUIT
+
+                # invoice amount totals:
+                imp_total = str("%.2f" % abs(invoice.amount_total))
+                imp_tot_conc = "0.00"
+                imp_neto = str("%.2f" % abs(invoice.amount_untaxed))
+                imp_iva = str("%.2f" % abs(invoice.amount_tax))
+                imp_subtotal = imp_neto  # TODO: not allways the case!
+                imp_trib = "0.00"
+                imp_op_ex = "0.00"
+                if invoice.currency_id.name == 'ARS':                
+                    moneda_id = "PES"
+                    moneda_ctz = 1
+                else:
+                    moneda_id = {'USD':'DOL'}[invoice.currency_id.name]
+                    moneda_ctz = str(invoice.currency_id.rate)
+
+                # foreign trade data: export permit, country code, etc.:
+                if invoice.pyafipws_incoterms:
+                    incoterms = invoice.pyafipws_incoterms.code
+                    incoterms_ds = invoice.pyafipws_incoterms.name
+                else:
+                    incoterms = incoterms_ds = None
+                if int(tipo_cbte) == 19 and tipo_expo == 1:
+                    permiso_existente =  "N" or "S"     # not used now
+                else:
+                    permiso_existente = ""
+                obs_generales = invoice.comment
+                if invoice.payment_term:
+                    forma_pago = invoice.payment_term.name
+                    obs_comerciales = invoice.payment_term.name
+                else:
+                    forma_pago = obs_comerciales = None
+                idioma_cbte = 1     # invoice language: spanish / español
+
+                # customer data (foreign trade):
+                nombre_cliente = invoice.partner_id.name
+                if invoice.partner_id.vat:
+                    if invoice.partner_id.vat.startswith("AR"):
+                        # use the Argentina AFIP's global CUIT for the country:
+                        cuit_pais_cliente = invoice.partner_id.vat[2:]
+                        id_impositivo = None
+                    else:
+                        # use the VAT number directly
+                        id_impositivo = invoice.partner_id.vat[2:] 
+                        # TODO: the prefix could be used to map the customer country
+                        cuit_pais_cliente = None
+                else:
+                    cuit_pais_cliente = id_impositivo = None
+                if invoice.address_invoice_id:
+                    domicilio_cliente = " - ".join([
+                                        invoice.address_invoice_id.name or '',
+                                        invoice.address_invoice_id.street or '',
+                                        invoice.address_invoice_id.street2 or '',
+                                        ])
+                    localidad_cliente = " - ".join([
+                                        invoice.address_invoice_id.city or '',
+                                        invoice.address_invoice_id.zip or '',
+                                        ])
+                    provincia_cliente = invoice.address_invoice_id.state_id
+                else:
+                    domicilio_cliente = ""
+                    localidad_cliente = ""
+                    provincia_cliente = ""
+                if invoice.address_invoice_id.country_id:
+                    # map ISO country code to AFIP destination country code:
+                    iso_code = invoice.address_invoice_id.country_id.code.lower()
+                    pais_dst_cmp = AFIP_COUNTRY_CODE_MAP[iso_code]                
+
+                # set AFIP returned values 
+                cae = invoice.pyafipws_cae or ""
+                fch_venc_cae = (invoice.pyafipws_cae_due_date or "").replace("-", "")
+                motivo = invoice.pyafipws_message or ""
+
+                # create the invoice internally in the helper
+                fepdf.CrearFactura(concepto, tipo_doc, nro_doc, tipo_cbte, punto_vta,
+                    cbte_nro, imp_total, imp_tot_conc, imp_neto,
+                    imp_iva, imp_trib, imp_op_ex, fecha_cbte, fecha_venc_pago, 
+                    fecha_serv_desde, fecha_serv_hasta, 
+                    moneda_id, moneda_ctz, cae, fch_venc_cae, id_impositivo,
+                    nombre_cliente, domicilio_cliente, pais_dst_cmp, 
+                    obs_comerciales, obs_generales, forma_pago, incoterms, 
+                    idioma_cbte, motivo)
+    
+                # set custom extra data:
+                fepdf.AgregarDato("localidad_cliente", localidad_cliente)
+                fepdf.AgregarDato("provincia_cliente", provincia_cliente)
+
+                # analyze VAT (IVA) and other taxes (tributo):
+                for tax_line in invoice.tax_line:
+                    if "IVA" in tax_line.name:
+                        if '0%' in tax_line.name:
+                            iva_id = 3
+                        elif '10,5%' in tax_line.name:
+                            iva_id = 4
+                        elif '21%' in tax_line.name:
+                            iva_id = 5
+                        elif '27%' in tax_line.name:
+                            iva_id = 6
+                        else:
+                            ivva_id = 0
+                        base_imp = ("%.2f" % abs(tax_line.base))
+                        importe = ("%.2f" % abs(tax_line.amount))
+                        # add the vat detail in the helper
+                        fepdf.AgregarIva(iva_id, base_imp, importe)
+                    else:
+                        if 'impuesto' in tax_line.name.lower():
+                            tributo_id = 1  # nacional
+                        elif 'iibbb' in tax_line.name.lower():
+                            tributo_id = 3  # provincial
+                        elif 'tasa' in tax_line.name.lower():
+                            tributo_id = 4  # municipal
+                        else:
+                            tributo_id = 99
+                        desc = tax_line.name
+                        base_imp = ("%.2f" % abs(tax_line.base))
+                        importe = ("%.2f" % abs(tax_line.amount))
+                        alic = "%.2f" % tax_line.base
+                        # add the other tax detail in the helper
+                        fepdf.AgregarTributo(id, desc, base_imp, alic, importe)                    
+
+                # analize line items - invoice detail
+                for line in invoice.invoice_line:
+                    codigo = line.product_id.code
+                    u_mtx = 1                       # TODO: get it from uom? 
+                    cod_mtx = line.product_id.ean13
+                    ds = line.name
+                    qty = line.quantity
+                    umed = 7                        # TODO: line.uos_id...?
+                    precio = line.price_unit
+                    importe = line.price_subtotal
+                    bonif = line.discount or None
+                    iva_id = 5                      # TODO: line.tax_code_id?
+                    imp_iva = importe * line.invoice_line_tax_id[0].amount
+                    fepdf.AgregarDetalleItem(u_mtx, cod_mtx, codigo, ds, qty, umed, 
+                        precio, bonif, iva_id, imp_iva, importe, despacho="")
+
+            fepdf.CrearPlantilla(papel="A4", orientacion="portrait")
+            fepdf.ProcesarPlantilla(num_copias=1, lineas_max=24, qty_pos='izq')
+            report_type = datas.get('report_type', 'pdf')
+            pdf = fepdf.GenerarPDF()
+            return (pdf, report_type)
+        except:
+            # catch the exception and send a better message for the user:
+            from pyafipws import utils
+            ex = utils.exception_info()
+            raise osv.except_osv(ex['msg'], ex['tb'])
+
         
-report_py('report.pyafipws.invoice', 'account.invoice', '', '',)
+report_pyfepdf('report.pyafipws.invoice')
                        
