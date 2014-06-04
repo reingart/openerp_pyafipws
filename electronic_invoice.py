@@ -24,7 +24,6 @@ __license__ = "AGPL 3.0+"
 
 from osv import fields, osv
 from report.interface import report_int
-
 import os, time
 import datetime
 import decimal
@@ -34,6 +33,7 @@ import sys
 import traceback
 
 DEBUG = True
+
 AFIP_COUNTRY_CODE_MAP = {
                     'ar': 200, 'bo': 202, 'br': 203, 'ca': 204, 'co': 205, 
                     'cu': 207, 'cl': 208, 'ec': 210, 'us': 212, 'mx': 218, 
@@ -323,8 +323,12 @@ class electronic_invoice(osv.osv):
                     precio = line.price_unit
                     importe = line.price_subtotal
                     bonif = line.discount or None
-                    iva_id = 5                      # TODO: line.tax_code_id?
-                    imp_iva = importe * line.invoice_line_tax_id[0].amount
+                    if line.invoice_line_tax_id:
+                        iva_id = 5                      # TODO: line.tax_code_id?
+                        imp_iva = importe * line.invoice_line_tax_id[0].amount
+                    else:
+                        iva_id = 1
+                        imp_iva = 0
                     if service == 'wsmtxca':
                         ws.AgregarItem(u_mtx, cod_mtx, codigo, ds, qty, umed, 
                                 precio, bonif, iva_id, imp_iva, importe+imp_iva)
