@@ -337,13 +337,17 @@ class electronic_invoice(osv.osv):
                                 bonif)
             
             # Request the authorization! (call the AFIP webservice method)
+            vto = None
             try:
                 if service == 'wsfe':
                     ws.CAESolicitar()
+                    vto = ws.Vencimiento
                 elif service == 'wsmtxca':
                     ws.AutorizarComprobante()
+                    vto = ws.Vencimiento
                 elif service == 'wsfex':
                     ws.Authorize(invoice.id)
+                    vto = ws.FchVencCAE
             except SoapFault as fault:
                 msg = 'Falla SOAP %s: %s' % (fault.faultcode, fault.faultstring)
             except Exception, e:
@@ -358,7 +362,7 @@ class electronic_invoice(osv.osv):
                 msg = u"\n".join([ws.Obs or "", ws.ErrMsg or ""])
             # calculate the barcode:
             if ws.CAE:
-                cae_due = ''.join([c for c in str(ws.Vencimiento or '') 
+                cae_due = ''.join([c for c in str(vto or '') 
                                            if c.isdigit()])
                 bars = ''.join([str(ws.Cuit), "%02d" % int(tipo_cbte), 
                                   "%04d" % int(punto_vta), 
@@ -369,7 +373,7 @@ class electronic_invoice(osv.osv):
             # store the results
             self.write(cr, uid, invoice.id, 
                        {'pyafipws_cae': ws.CAE,
-                        'pyafipws_cae_due_date': ws.Vencimiento or None,
+                        'pyafipws_cae_due_date': vto or None,
                         'pyafipws_result': ws.Resultado,
                         'pyafipws_message': msg,
                         'pyafipws_xml_request': ws.XmlRequest,
