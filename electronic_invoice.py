@@ -116,19 +116,20 @@ class electronic_invoice(osv.osv):
             
             # import the AFIP webservice helper for electronic invoice
             if service == 'wsfe':
-                from pyafipws.wsfev1 import WSFEv1, SoapFault   # local market
+                from pyafipws.wsfev1 import WSFEv1 # local market
                 ws = WSFEv1()
             elif service == 'wsmtxca':
-                from pyafipws.wsmtx import WSMTXCA, SoapFault   # local + detail
+                from pyafipws.wsmtx import WSMTXCA # local + detail
                 wsdl = cfg.get_param(cr, uid, 'pyafipws.wsmtxca.url', context=context)
                 ws = WSMTXCA()
             elif service == 'wsfex':
-                from pyafipws.wsfexv1 import WSFEXv1, SoapFault # foreign trade
+                from pyafipws.wsfexv1 import WSFEXv1 
                 wsdl = cfg.get_param(cr, uid, 'pyafipws.wsfex.url', context=context)
                 ws = WSFEXv1()
             else:
                 raise osv.except_osv('Error !', "%s no soportado" % service)
-            
+
+            from pyafipws.utils import SoapFault
             # connect to the webservice and call to the test method
             ws.Conectar(cache or "", wsdl or "", proxy or "")
             # set AFIP webservice credentials:
@@ -146,9 +147,9 @@ class electronic_invoice(osv.osv):
             cbte_nro_next = int(cbte_nro_afip or 0) + 1
             # verify that the invoice is the next one to be registered in AFIP    
             if cbte_nro != cbte_nro_next:
-                raise osv.except_osv('Error !', 
-                        'Referencia: %s \n' 
-                        'El número del comprobante debería ser %s y no %s' % (
+                raise osv.except_osv(u'Error !', 
+                        u'Referencia: %s \n' 
+                        u'El número del comprobante debería ser %s y no %s' % (
                         str(invoice.number), str(cbte_nro_next), str(cbte_nro)))
 
             # invoice number range (from - to) and date:
@@ -209,7 +210,7 @@ class electronic_invoice(osv.osv):
                 moneda_ctz = str(invoice.currency_id.rate)
 
             # foreign trade data: export permit, country code, etc.:
-            if invoice.pyafipws_incoterms:
+            if False:##invoice.pyafipws_incoterms:
                 incoterms = invoice.pyafipws_incoterms.code
                 incoterms_ds = invoice.pyafipws_incoterms.name
             else:
@@ -240,19 +241,20 @@ class electronic_invoice(osv.osv):
                     cuit_pais_cliente = None
             else:
                 cuit_pais_cliente = id_impositivo = None
-            if invoice.address_invoice_id:
+            # OpenERP 7 no tiene address_invoice_id
+            if invoice.partner_id:
                 domicilio_cliente = " - ".join([
-                                    invoice.address_invoice_id.name or '',
-                                    invoice.address_invoice_id.street or '',
-                                    invoice.address_invoice_id.street2 or '',
-                                    invoice.address_invoice_id.zip or '',
-                                    invoice.address_invoice_id.city or '',
+                                    invoice.partner_id.name or '',
+                                    invoice.partner_id.street or '',
+                                    invoice.partner_id.street2 or '',
+                                    invoice.partner_id.zip or '',
+                                    invoice.partner_id.city or '',
                                     ])
             else:
                 domicilio_cliente = ""
-            if invoice.address_invoice_id.country_id:
+            if invoice.partner_id.country_id:
                 # map ISO country code to AFIP destination country code:
-                iso_code = invoice.address_invoice_id.country_id.code.lower()
+                iso_code = invoice.partner_id.country_id.code.lower()
                 pais_dst_cmp = AFIP_COUNTRY_CODE_MAP[iso_code]
                 
 
@@ -614,7 +616,7 @@ class report_pyfepdf(report_int):
                     moneda_ctz = str(invoice.currency_id.rate)
 
                 # foreign trade data: export permit, country code, etc.:
-                if invoice.pyafipws_incoterms:
+                if False: ##invoice.pyafipws_incoterms:
                     incoterms = invoice.pyafipws_incoterms.code
                     incoterms_ds = invoice.pyafipws_incoterms.name
                 else:
@@ -645,24 +647,25 @@ class report_pyfepdf(report_int):
                         cuit_pais_cliente = None
                 else:
                     cuit_pais_cliente = id_impositivo = None
-                if invoice.address_invoice_id:
+                # address_invoice_id -> partner_id
+                if invoice.partner_id:
                     domicilio_cliente = " - ".join([
-                                        invoice.address_invoice_id.name or '',
-                                        invoice.address_invoice_id.street or '',
-                                        invoice.address_invoice_id.street2 or '',
+                                        invoice.partner_id.name or '',
+                                        invoice.partner_id.street or '',
+                                        invoice.partner_id.street2 or '',
                                         ])
                     localidad_cliente = " - ".join([
-                                        invoice.address_invoice_id.city or '',
-                                        invoice.address_invoice_id.zip or '',
+                                        invoice.partner_id.city or '',
+                                        invoice.partner_id.zip or '',
                                         ])
-                    provincia_cliente = invoice.address_invoice_id.state_id
+                    provincia_cliente = invoice.partner_id.state_id
                 else:
                     domicilio_cliente = ""
                     localidad_cliente = ""
                     provincia_cliente = ""
-                if invoice.address_invoice_id.country_id:
+                if invoice.partner_id.country_id:
                     # map ISO country code to AFIP destination country code:
-                    iso_code = invoice.address_invoice_id.country_id.code.lower()
+                    iso_code = invoice.partner_id.country_id.code.lower()
                     pais_dst_cmp = AFIP_COUNTRY_CODE_MAP[iso_code]                
 
                 # set AFIP returned values 

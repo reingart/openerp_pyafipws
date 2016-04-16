@@ -22,6 +22,8 @@ __copyright__ = "Copyright (C) 2013 Mariano Reingart and others"
 __license__ = "AGPL 3.0+"
 
 from osv import fields, osv
+from openerp.exceptions import Warning
+
 try:
     from openerp.tools.translate import _
 except:
@@ -32,36 +34,36 @@ DEBUG = True
 
 class journal_pyafipws_electronic_invoice(osv.osv):
     _name = "account.journal"
-    _inherit = "account.journal"
+    _inherit = ["account.journal", 'mail.thread']
     _columns = {
         'pyafipws_electronic_invoice_service': fields.selection([
-			    ('wsfe','Mercado interno -sin detalle- RG2485 (WSFEv1)'),
-			    ('wsmtxca','Mercado interno -con detalle- RG2904 (WSMTXCA)'),
-			    ('wsbfe','Bono Fiscal -con detalle- RG2557 (WSMTXCA)'),
-			    ('wsfex','Exportación -con detalle- RG2758 (WSFEXv1)'),
+                ('wsfe','Mercado interno -sin detalle- RG2485 (WSFEv1)'),
+                ('wsmtxca','Mercado interno -con detalle- RG2904 (WSMTXCA)'),
+                ('wsbfe','Bono Fiscal -con detalle- RG2557 (WSMTXCA)'),
+                ('wsfex','Exportación -con detalle- RG2758 (WSFEXv1)'),
             ], _('AFIP WS electronic invoice'), 
             help="Habilita la facturación electrónica por webservices AFIP"),
-		'pyafipws_invoice_type' : fields.selection([
-			    ( '1','01-Factura A'),
-			    ( '2','02-Nota de Débito A'),
-			    ( '3','03-Nota de Crédito A'),
-			    ( '4','04-Recibos A'),
-			    ( '5','05-Nota de Venta al Contado A'),
-			    ( '6','06-Factura B'),
-			    ( '7','07-Nota de Débito B'),
-			    ( '8','08-Nota de Crédito B'),
-			    ( '9','09-Recibos B'),
-			    ('10','10-Notas de Venta al Contado B'),
-			    ('11','11-Factura C'),
-			    ('12','12-Nota de Débito C'),
-			    ('13','13-Nota de Crédito C'),
-			    ('15','Recibo C'),
-			    ('19','19-Factura E'),
-			    ('20','20-Nota de Débito E'),
-			    ('21','21-Nota de Crédito E'),
-			    ], 'Tipo Comprobante AFIP', 
+        'pyafipws_invoice_type' : fields.selection([
+                ( '1','01-Factura A'),
+                ( '2','02-Nota de Débito A'),
+                ( '3','03-Nota de Crédito A'),
+                ( '4','04-Recibos A'),
+                ( '5','05-Nota de Venta al Contado A'),
+                ( '6','06-Factura B'),
+                ( '7','07-Nota de Débito B'),
+                ( '8','08-Nota de Crédito B'),
+                ( '9','09-Recibos B'),
+                ('10','10-Notas de Venta al Contado B'),
+                ('11','11-Factura C'),
+                ('12','12-Nota de Débito C'),
+                ('13','13-Nota de Crédito C'),
+                ('15','Recibo C'),
+                ('19','19-Factura E'),
+                ('20','20-Nota de Débito E'),
+                ('21','21-Nota de Crédito E'),
+                ], 'Tipo Comprobante AFIP', 
             help="Tipo de Comprobante AFIP"),
-		'pyafipws_point_of_sale' : fields.integer('Punto de Venta AFIP', 
+        'pyafipws_point_of_sale' : fields.integer('Punto de Venta AFIP', 
             help="Prefijo de emisión habilitado en AFIP"),
     }
 
@@ -95,8 +97,12 @@ class journal_pyafipws_electronic_invoice(osv.osv):
                     service,
                     ws.AppServerStatus, 
                     ws.DbServerStatus,
-                    ws.AuthServerStatus)        
+                    ws.AuthServerStatus)   
+                                        
             self.log(cr, uid, ids[0], msg) 
+            # OpenChatter (new)
+            self.message_post(cr, uid, ids, "AFIP Dummy Test", msg, context=context)
+            raise Warning(msg)
             return {}
 
     def test_pyafipws_point_of_sales(self, cr, uid, ids, context=None):
@@ -123,9 +129,13 @@ class journal_pyafipws_electronic_invoice(osv.osv):
             wsfev1.Sign = auth_data['sign']
             # call the webservice method to get the enabled point of sales:
             ret = wsfev1.ParamGetPtosVenta(sep=" ")
-            msg = "Pts.Vta. Habilitados en AFIP: " + '. '.join(ret)
-            msg += " - ".join([wsfev1.Excepcion, wsfev1.ErrMsg, wsfev1.Obs])
+            msg = u"Pts.Vta. Habilitados en AFIP: " + '. '.join(ret)
+            ws = wsfev1
+            msg += u" - ".join([ws.Excepcion, ws.ErrMsg, ws.Obs])
             self.log(cr, uid, ids[0], msg) 
+            # OpenChatter (new)
+            self.message_post(cr, uid, ids, "AFIP Ptos.Vta.", msg, context=context)
+            raise Warning(msg)
             return {}
     
     def get_pyafipws_last_invoice(self, cr, uid, ids, 
@@ -165,8 +175,12 @@ class journal_pyafipws_electronic_invoice(osv.osv):
                     ult = ws.CompUltimoAutorizado(tipo_cbte, punto_vta)
                 elif service == "wsfex":
                     ult = ws.GetLastCMP(tipo_cbte, punto_vta)
-                msg = " - ".join([ws.Excepcion, ws.ErrMsg, ws.Obs])
+                msg = u"Ult.Cbte: Nro %s" % (ult, )
+                msg += u" - ".join([ws.Excepcion, ws.ErrMsg, ws.Obs])
                 self.log(cr, uid, ids[0], u"Ult.Cbte: N° %s %s" % (ult, msg))
+                # OpenChatter (new)
+                self.message_post(cr, uid, ids, "AFIP Ult. Nro", msg, context=context)
+                ##raise Warning(msg)
                 ret[journal.id] = str(ult)
             else:
                 msg = auth_data['err_msg']
